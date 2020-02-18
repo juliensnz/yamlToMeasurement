@@ -25,39 +25,42 @@ const translations = fs
     return { ...result, [locale]: yamlTranslations };
   }, {});
 
-const lines = Object.keys(yamlMeasures).map(value => {
-  const measureFamilyName = value;
-  const labels = Object.keys(translations).reduce((result, locale) => {
+const getLabels = (translations, type, key) =>
+  Object.keys(translations).reduce((result, locale) => {
     if (
       undefined === translations[locale] ||
-      undefined === translations[locale].families ||
-      undefined === translations[locale].families[measureFamilyName]
+      undefined === translations[locale][type] ||
+      undefined === translations[locale][type][key]
     )
       return result;
 
     return {
       ...result,
-      [locale]: translations[locale].families[measureFamilyName]
+      [locale]: translations[locale][type][key]
     };
   }, {});
-  const standardUnit = yamlMeasures[value].standard;
-  const units = Object.keys(yamlMeasures[value].units).map(unitCode => ({
+
+const lines = Object.keys(yamlMeasures).map(measureFamilyName => {
+  const labels = getLabels(translations, "families", measureFamilyName);
+  const standardUnit = yamlMeasures[measureFamilyName].standard;
+  const units = Object.keys(yamlMeasures[measureFamilyName].units).map(unitCode => ({
     code: unitCode,
-    convert: yamlMeasures[value].units[unitCode].convert.map(convertObject => {
+    labels: getLabels(translations, "units", unitCode),
+    convert: yamlMeasures[measureFamilyName].units[unitCode].convert.map(convertObject => {
       const operator = Object.keys(convertObject)[0];
 
       return { operator, value: convertObject[operator] };
     }),
-    symbol: yamlMeasures[value].units[unitCode].symbol
+    symbol: yamlMeasures[measureFamilyName].units[unitCode].symbol
   }));
 
-  return `('${measureFamilyName}', '${standardUnit}', '${JSON.stringify(
+  return `('${measureFamilyName}', '${JSON.stringify(
     labels
-  )}', '${JSON.stringify(units)}')`;
+  )}', '${standardUnit}', '${JSON.stringify(units)}')`;
 });
 
 console.log(`
-INSERT INTO \`akeneo_measurement\` (\`code\`, \`standard_unit\`, \`labels\`, \`units\`)
+INSERT INTO \`akeneo_measurement\` (\`code\`, \`labels\`, \`standard_unit\`, \`units\`)
 VALUES
     ${lines.join(",\n    ")};
 `);
